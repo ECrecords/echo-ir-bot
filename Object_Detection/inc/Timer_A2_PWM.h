@@ -39,7 +39,7 @@
  *
  * @return None
  */
-void Timer_A2_PWM_Init(uint16_t period_constant, uint16_t duty_cycle_1, uint16_t duty_cycle_2);
+void Timer_A2_PWM_Init(uint16_t period_constant, uint16_t duty_cycle_1, uint16_t duty_cycle_2, uint16_t duty_cycle_3);
 
 /**
  * @brief Update the Timer A2 duty cycle for the PWM signal, P5.6 (PM_TA2.1, CCR[1])

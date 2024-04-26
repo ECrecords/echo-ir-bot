@@ -27,6 +27,7 @@
 #include "inc/Motor.h"
 #include "inc/SysTick_Interrupt.h"
 #include "inc/Timer_A1_Interrupt.h"
+#include "inc/Timer_A2_PWM.h"
 
 //#define CONTROLLER_1    1
 #define CONTROLLER_2    1
@@ -121,12 +122,25 @@ int main(void)
 
     // Initialize Timer A1 with interrupts enabled and an interrupt rate of 2 kHz
     Timer_A1_Interrupt_Init(&Timer_A1_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
+    
+    // Initialize Timer A2 with a period of 50 Hz
+    // Timer A2 will be used to drive two servos
+
+    Timer_A2_PWM_Init(TIMER_A2_PERIOD_CONSTANT, 0, 0, 10);
 
     // Enable the interrupts used by Timer A1 and other modules
     EnableInterrupts();
 
     while(1)
     {
-        // prints to debug here
+        // Rotate to 0
+        Timer_A2_Update_Duty_Cycle_1(1700);
+        Timer_A2_Update_Duty_Cycle_2(1700);
+        Clock_Delay1ms(3000);
+
+        // Rotate to 180
+        Timer_A2_Update_Duty_Cycle_1(7000);
+        Timer_A2_Update_Duty_Cycle_2(7000);
+        Clock_Delay1ms(3000);
     }
 }
