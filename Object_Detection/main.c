@@ -99,6 +99,39 @@ void Timer_A1_Periodic_Task(void)
     // this is where we would sample the sensors
 }
 
+/**
+ * @brief User-defined function executed by Timer A1 using a periodic interrupt at a rate of 2 kHz.
+ *
+ * The Timer_A1_Periodic_Task function generates a periodic interrupt with a rate of 2 kHz. It samples the
+ * distance values measured by three Sharp GP2Y0A21YK0F analog distance sensors.
+ *
+ * @param None
+ *
+ * @return None
+ */
+void Timer_A2_Periodic_Task(void)
+{
+    // this is where we would sample the sensors
+    static uint16_t last_capture = 0;
+    uint16_t capture = TIMER_A0->CCR[1];
+    uint16_t pulse_duration = capture - last_capture;
+    last_capture = capture;
+    printf("pulse_duration : %5d \n", pulse_duration);
+}
+
+uint16_t Get_Distance()
+{
+    US_100_UART_OutChar(0x55);
+    US_100_UART_Buffer[0] = US_100_UART_InChar();
+    US_100_UART_Buffer[1] = US_100_UART_InChar();
+
+    uint16_t distance_value = US_100_UART_Buffer[1] | (US_100_UART_Buffer[0] << 8);
+    printf("Distance: %d mm\n", distance_value);
+
+    // Clock_Delay1ms(100);
+    return distance_value;
+}
+
 int main(void)
 {
     // Initialize the 48 MHz Clock
@@ -113,6 +146,11 @@ int main(void)
     // Initialize the DC motors
     Motor_Init();
 
+    // Initialize the US-100 Ultrasonic Distance Sensor module
+    US_100_UART_Init();
+
+    char US_100_UART_Buffer[US_100_UART_BUFFER_SIZE] = {0};
+
     // Initialize motor duty cycle values
     Duty_Cycle_Left  = PWM_NOMINAL;
     Duty_Cycle_Right = PWM_NOMINAL;
@@ -122,11 +160,13 @@ int main(void)
 
     // Initialize Timer A1 with interrupts enabled and an interrupt rate of 2 kHz
     Timer_A1_Interrupt_Init(&Timer_A1_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
+
+    Timer_A2_Interrupt_Init(&Timer_A2_Periodic_Task, TIMER_A1_INT_CCR0_VALUE)
+
     
     // Initialize Timer A2 with a period of 50 Hz
     // Timer A2 will be used to drive two servos
-
-    Timer_A2_PWM_Init(TIMER_A2_PERIOD_CONSTANT, 0, 0, 10);
+    Timer_A2_PWM_Init(TIMER_A2_PERIOD_CONSTANT, 0, 0, 30);
 
     // Enable the interrupts used by Timer A1 and other modules
     EnableInterrupts();
@@ -134,13 +174,20 @@ int main(void)
     while(1)
     {
         // Rotate to 0
-        Timer_A2_Update_Duty_Cycle_1(1700);
-        Timer_A2_Update_Duty_Cycle_2(1700);
-        Clock_Delay1ms(3000);
+        // Timer_A2_Update_Duty_Cycle_1(1500);
+        // // Clock_Delay1ms(2000);
 
-        // Rotate to 180
-        Timer_A2_Update_Duty_Cycle_1(7000);
-        Timer_A2_Update_Duty_Cycle_2(7000);
-        Clock_Delay1ms(3000);
+        // Timer_A2_Update_Duty_Cycle_1(4000);
+        // // Clock_Delay1ms(2000);
+
+        // // Rotate to 180
+        // Timer_A2_Update_Duty_Cycle_1(6500);
+        // Clock_Delay1ms(2000);
+        for (int i = 1500; i <= 6500; i+= 250)
+        {
+            Timer_A2_Update_Duty_Cycle_1(i);
+            Clock_Delay1ms(50);
+        }
+
     }
 }

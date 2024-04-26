@@ -19,7 +19,7 @@ void Timer_A2_PWM_Init(uint16_t period_constant, uint16_t duty_cycle_1, uint16_t
     if (duty_cycle_1 >= period_constant) return;
     if (duty_cycle_2 >= period_constant) return;
 
-    // Configure pins P5.6 (PM_TA2.1) and P5.7 (PM_TA2.2) to use the primary module function
+    // Configure pins P5.6 (PM_TA2.1), P5.7 (PM_TA2.2) and P6.6 (PM_TA2.3) to use the primary module function
     // by setting Bits 6 and 7 in the SEL0 register for P5
     // and clearing Bits 6 and 7 in the SEL1 register for P5
     P5->SEL0 |= 0xC0;
@@ -51,13 +51,13 @@ void Timer_A2_PWM_Init(uint16_t period_constant, uint16_t duty_cycle_1, uint16_t
     // Duty Cycle %: duty_cycle_1 / period_constant
     TIMER_A2->CCR[1] = duty_cycle_1;
 
-    // Configure the output mode as Toggle / Reset for CCR[2]
-    // Set the bits of the OUTMOD field of the CCTL[2] register to 010b
-    TIMER_A2->CCTL[2] |= 0x0040;
+    // // Configure the output mode as Toggle / Reset for CCR[2]
+    // // Set the bits of the OUTMOD field of the CCTL[2] register to 010b
+    // TIMER_A2->CCTL[2] |= 0xC110;
 
-    // Assign the value of duty_cycle_1 to the CCR[2] register
-    // Duty Cycle %: duty_cycle_2 / period_constant
-    TIMER_A2->CCR[2] = duty_cycle_2;
+    // // Assign the value of duty_cycle_1 to the CCR[2] register
+    // // Duty Cycle %: duty_cycle_2 / period_constant
+    // TIMER_A2->CCR[2] = duty_cycle_2;
 
     // Configure the output mode as Toggle / Reset for CCR[3]
     // Set the bits of the OUTMOD field of the CCTL[3] register to 010b
@@ -85,9 +85,9 @@ void Timer_A2_Update_Duty_Cycle_1(uint16_t duty_cycle_1)
 
 void Timer_A2_Update_Duty_Cycle_2(uint16_t duty_cycle_2)
 {
-    // Immediately return if duty cycle is greater than the given period
-    if (duty_cycle_2 >= TIMER_A2->CCR[0]) return;
+    // // Immediately return if duty cycle is greater than the given period
+    // if (duty_cycle_2 >= TIMER_A2->CCR[0]) return;
 
-    // Otherwise, update the duty cycle
-    TIMER_A2->CCR[2] = duty_cycle_2;
+    // // Otherwise, update the duty cycle
+    // TIMER_A2->CCR[2] = duty_cycle_2;
 }

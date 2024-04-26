@@ -29,11 +29,11 @@ void Timer_A2_Interrupt_Init(void(*task)(void), uint16_t period)
     // Enable interrupt request of the
     // corresponding Capture/Compare interrupt flag
     // in the CCTL[0] register using the CCIE bit
-    TIMER_A2->CCTL[0] |= 0x0010;
+    TIMER_A2->CCTL[2] |= 0xC110;
 
     // Store the period in the CCR0 register
     // Note: Timer starts counting from 0
-    TIMER_A2->CCR[0] = (period - 1);
+    // TIMER_A2->CCR[2] = (period - 1);
 
     // Divide the SMCLK frequency by 1 by clearing the
     // TAIDEX bits of the EX0 register
@@ -60,7 +60,7 @@ void Timer_A2_Stop(void)
     NVIC->ICER[0] = 0x00001000;
 }
 
-void TA2_0_IRQHandler(void)
+void TA2_2_IRQHandler(void)
 {
     // Acknowledge Capture/Compare interrupt and clear it
     TIMER_A2->CCTL[0] &= ~0x0001;
