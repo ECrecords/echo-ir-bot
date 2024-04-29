@@ -28,6 +28,7 @@
 #include "inc/SysTick_Interrupt.h"
 #include "inc/Timer_A1_Interrupt.h"
 #include "inc/Timer_A2_PWM.h"
+#include "inc/US_100_UART.h"
 
 //#define CONTROLLER_1    1
 #define CONTROLLER_2    1
@@ -45,6 +46,9 @@
 #define PWM_SWING           1000
 #define PWM_MIN             0
 #define PWM_MAX             (PWM_NOMINAL + PWM_SWING)
+
+#define START_MOTOR_PWM     1250
+#define FINISH_MOTOR_PWD    6500
 
 // Declare global variables used to store filtered distance values from the Analog Distance Sensor
 uint32_t Filtered_Distance_Left;
@@ -68,6 +72,7 @@ int32_t Set_Point = 250;
 // Declare global variables used to update PWM duty cycle values for the motors
 uint16_t Duty_Cycle_Left;
 uint16_t Duty_Cycle_Right;
+
 
 /**
  * @brief This function is the handler for the SysTick periodic interrupt with a rate of 100 Hz.
@@ -121,14 +126,15 @@ void Timer_A2_Periodic_Task(void)
 
 uint16_t Get_Distance()
 {
+    char US_100_UART_Buffer[US_100_UART_BUFFER_SIZE] = {0};
     US_100_UART_OutChar(0x55);
     US_100_UART_Buffer[0] = US_100_UART_InChar();
     US_100_UART_Buffer[1] = US_100_UART_InChar();
 
     uint16_t distance_value = US_100_UART_Buffer[1] | (US_100_UART_Buffer[0] << 8);
-    printf("Distance: %d mm\n", distance_value);
+    // printf("Distance: %d mm\n", distance_value);
 
-    // Clock_Delay1ms(100);
+    // Clock_Delay1ms(20);
     return distance_value;
 }
 
@@ -149,7 +155,6 @@ int main(void)
     // Initialize the US-100 Ultrasonic Distance Sensor module
     US_100_UART_Init();
 
-    char US_100_UART_Buffer[US_100_UART_BUFFER_SIZE] = {0};
 
     // Initialize motor duty cycle values
     Duty_Cycle_Left  = PWM_NOMINAL;
@@ -161,7 +166,7 @@ int main(void)
     // Initialize Timer A1 with interrupts enabled and an interrupt rate of 2 kHz
     Timer_A1_Interrupt_Init(&Timer_A1_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
 
-    Timer_A2_Interrupt_Init(&Timer_A2_Periodic_Task, TIMER_A1_INT_CCR0_VALUE)
+    // Timer_A2_Interrupt_Init(&Timer_A2_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
 
     
     // Initialize Timer A2 with a period of 50 Hz
@@ -171,23 +176,26 @@ int main(void)
     // Enable the interrupts used by Timer A1 and other modules
     EnableInterrupts();
 
+    int i = START_MOTOR_PWM;
+    uint16_t STEP_MOTOR_PWM = 250;
+
     while(1)
     {
-        // Rotate to 0
-        // Timer_A2_Update_Duty_Cycle_1(1500);
-        // // Clock_Delay1ms(2000);
-
-        // Timer_A2_Update_Duty_Cycle_1(4000);
-        // // Clock_Delay1ms(2000);
-
-        // // Rotate to 180
-        // Timer_A2_Update_Duty_Cycle_1(6500);
-        // Clock_Delay1ms(2000);
-        for (int i = 1500; i <= 6500; i+= 250)
+        for (; i <= FINISH_MOTOR_PWD; i += STEP_MOTOR_PWM)
         {
             Timer_A2_Update_Duty_Cycle_1(i);
-            Clock_Delay1ms(50);
+            uint16_t distance_value = Get_Distance();
+            int angle = (i - 4000) / 250 * 6;
+            printf("Angle : %5d  Distance: %d mm\n", angle, distance_value);
+            Clock_Delay1ms(30);
         }
-
+        for (; i >= START_MOTOR_PWM; i -= STEP_MOTOR_PWM)
+        {
+            Timer_A2_Update_Duty_Cycle_1(i);
+            uint16_t distance_value = Get_Distance();
+            int angle = (i - 4000) / 250 * 6;
+            printf("Angle : %5d  Distance: %d mm\n", angle, distance_value);
+            Clock_Delay1ms(30);
+        }
     }
 }
