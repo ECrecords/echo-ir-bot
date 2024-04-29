@@ -5,6 +5,11 @@
  * This file contains the function definitions for configuring Timer A2 in Pulse Width Modulation (PWM) mode.
  * It provides functions for initializing the PWM timer, updating duty cycles for PWM signals, and controlling
  * the PWM output on specific pins.
+ * 
+ * For MG995 servos, 
+ *  - MG995 PWM             (Orange)    <-->  MSP432 LaunchPad Pin P5.6
+ *  - MG995 VCC             (Red)       <-->  MSP432 LaunchPad VCC (5.0V)
+ *  - MG995 GND             (Brown)     <-->  MSP432 LaunchPad GND
  *
  * @author Aaron Nanas
  *
