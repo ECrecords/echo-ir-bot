@@ -47,6 +47,7 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+    SPI_MASTER
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -56,6 +57,7 @@ target_link_libraries(${PROJECT_NAME}
         pico_stdlib              # for core functionality
         # pico_cyw43_arch_none
         pico_cyw43_arch_lwip_sys_freertos
+        pico_lwip_iperf
         FreeRTOS-Kernel-Heap4    # FreeRTOS kernel and dynamic heap
         )
 

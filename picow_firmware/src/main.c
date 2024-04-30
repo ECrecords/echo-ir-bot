@@ -3,8 +3,13 @@
 #include "hardware/spi.h"
 #include "hardware/dma.h"
 #include "hardware/irq.h"
-#include "lwipopts.h"
 #include "stdlib.h"
+
+#include "lwipopts.h"
+#include "lwip/tcp.h"
+#include "lwip/sockets.h"
+#include "lwip/ip_addr.h"
+#include "lwip/netif.h"
 
 // FreeRTOS includes
 #include "FreeRTOS.h"
@@ -13,8 +18,22 @@
 #include "queue.h"
 
 #define SERVER_ADDR "192.168.0.163"
+#define SERVER_PORT 8008
 
-static QueueHandle_t rx_queue;
+#define SPI_RX spi1
+#define SPI_BAUD_RATE 1000 * 1000
+#define SPI_RX_SCK 10
+#define SPI_RX_MOSI 11
+#define SPI_RX_MISO 12
+#define SPI_RX_CS 13
+
+#ifdef SPI_MASTER
+#define SPI_TX spi0
+#define SPI_TX_SCK 2
+#define SPI_TX_MOSI 3
+#define SPI_TX_MISO 4
+#define SPI_TX_CS 5
+#endif
 
 typedef struct RadarData_
 {
@@ -22,77 +41,92 @@ typedef struct RadarData_
     uint32_t angle;
 } RadarData_t;
 
-uint8_t buffer[8];
+typedef union
+{
+    uint8_t buff[8];
+    RadarData_t rd;
+} data_t;
+
+static int rx_channel;
+static data_t dma_data;
+static QueueHandle_t rx_queue;
 
 void SendDataToServer(RadarData_t *rx_data)
 {
-    printf("Distance: %d\n", rx_data->distance);
-    printf("Angle: %d\n", rx_data->angle);
-}
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
-void xHandleReceive(void *pvParameters)
-{
-
-    RadarData_t rx_data;
-
-    while (1)
+    if (sockfd < 0)
     {
-        if (xQueueReceive(rx_queue, &rx_data, portMAX_DELAY) == pdTRUE)
-        {
-            SendDataToServer(&rx_data);
-        }
+        printf("Failed to create socket\n");
+        return;
     }
+
+    struct sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
+        printf("Failed to connect to server\n");
+        return;
+    }
+
+    char buff[256];
+
+    sprintf(buff, "distance: %d, angle: %d", rx_data->distance, rx_data->angle);
+
+    send(sockfd, buff, strlen(buff), 0);
+
+    close(sockfd);
 }
 
 void ConfigWifi(void *pvParameters)
 {
+    RadarData_t rx_data;
+
+    uint connect_attempts = 0;
+
     if (cyw43_arch_init())
     {
-        printf("failed to initialise\n");
-        return;
+        panic("Failed to initialise");
     }
+    
     cyw43_arch_enable_sta_mode();
     printf("Connecting to Wi-Fi...\n");
-    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000))
-    {
-        printf("failed to connect.\n");
-        exit(1);
-    }
-    else
-    {
-        printf("Connected.\n");
-    }
 
-    ip_addr_t server_addr;
-    ipaddr_aton(SERVER_ADDR, &server_addr);
-
-    while (true)
-    {
-        // not much to do as LED is in another task, and we're using RAW (callback) lwIP API
-        printf("Sending data to server...\n");
-        vTaskDelay(100);
+    while (connect_attempts < 5) {
+        if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 10000))
+        {
+            printf("Failed to connect to Wi-Fi. Retrying... %d\n", connect_attempts);
+            connect_attempts++;
+        }
+        else
+        {
+            printf("Connected.\n");
+            break;
+        }
     }
 
+    while(1) {
+        if (xQueueReceive(rx_queue, &rx_data, portMAX_DELAY) == pdTRUE)
+        {
+            if (cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_JOIN){
+                SendDataToServer(&rx_data);
+            }
+        }
+    }
+    
     cyw43_arch_deinit();
 }
 
-#define SPI_RX_SCK 2
-#define SPI_RX_MOSI 3
-#define SPI_RX_MISO 4
-#define SPI_RX_CS 5
+void tx_handle()
+{
 
-int rx_channel;
+    xQueueSendFromISR(rx_queue, &dma_data.rd, NULL);
 
-void tx_handle() {
-    printf("Transfer finished\nData: ");
-
-    for (size_t i = 0; i < 8; i++) {
-        printf(" 0x%0x", buffer[i]);
-    }
-    print("\n");
-
-    dma_channel_set_write_addr(rx_channel, buffer, true);
-    // NEED TO ACK INTERRUPT
+    dma_channel_acknowledge_irq0(rx_channel);
+    dma_channel_set_write_addr(rx_channel, dma_data.buff, true);
 }
 
 void configure_spi_rx()
@@ -103,6 +137,10 @@ void configure_spi_rx()
     gpio_set_function(SPI_RX_MISO, GPIO_FUNC_SPI);
     gpio_set_function(SPI_RX_CS, GPIO_FUNC_SPI);
 
+    spi_init(SPI_RX, SPI_BAUD_RATE);
+    spi_set_format(SPI_RX, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_slave(SPI_RX, true);
+
     rx_channel = dma_claim_unused_channel(true);
     dma_channel_config c = dma_channel_get_default_config(rx_channel);
 
@@ -112,23 +150,62 @@ void configure_spi_rx()
     channel_config_set_write_increment(&c, true);
 
     dma_channel_configure(rx_channel, &c,
-                          buffer,
-                          spi0_hw->dr,
+                          dma_data.buff,
+                          &spi_get_hw(SPI_RX)->dr,
                           8,
                           false);
+
+    irq_set_exclusive_handler(DMA_IRQ_0, tx_handle);
+    irq_set_enabled(DMA_IRQ_0, true);
+    dma_channel_set_irq0_enabled(rx_channel, true);
+
+    dma_channel_start(rx_channel);
 }
 
+#ifdef SPI_MASTER
+void run_master(void *pvParameters)
+{
+    data_t data;
+
+    gpio_init_mask((1 << SPI_TX_CS) | (1 << SPI_TX_MOSI) | (1 << SPI_TX_MISO) | (1 << SPI_TX_CS));
+    gpio_set_function(SPI_TX_SCK, GPIO_FUNC_SPI);
+    gpio_set_function(SPI_TX_MOSI, GPIO_FUNC_SPI);
+    gpio_set_function(SPI_TX_MISO, GPIO_FUNC_SPI);
+    gpio_set_function(SPI_TX_CS, GPIO_FUNC_SPI);
+
+    spi_init(spi0, SPI_BAUD_RATE);
+    spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_slave(spi0, false);
+
+    data.rd.distance = 0;
+    data.rd.angle = 0;
+
+    while (1)
+    {
+
+        spi_write_blocking(spi0, data.buff, 8);
+
+        data.rd.angle++;
+        data.rd.distance++;
+
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+#endif
 int main()
 {
     stdio_uart_init();
 
-    config_i2c_slave();
+    configure_spi_rx();
 
-    rx_queue = xQueueCreate(10, sizeof(RadarData_t));
+    rx_queue = xQueueCreate(512, sizeof(RadarData_t));
 
     xTaskCreate(ConfigWifi, "ConfigWifi", 512, NULL, 1, NULL);
-    xTaskCreate(xHandleReceive, "HandleReceive", 1024, NULL, 1, NULL);
-    xTaskCreate(run_master, "RunMaster", 1024, NULL, 1, NULL);
+    // xTaskCreate(xHandleReceive, "HandleReceive", 512, NULL, 1, NULL);
+
+#ifdef SPI_MASTER
+    xTaskCreate(run_master, "RunMaster", 512, NULL, 1, NULL);
+#endif
 
     vTaskStartScheduler();
 
