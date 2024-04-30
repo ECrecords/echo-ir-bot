@@ -51,7 +51,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME}
         pico_i2c_slave
-        hardware_i2c
+        hardware_spi
+        hardware_dma
         pico_stdlib              # for core functionality
         # pico_cyw43_arch_none
         pico_cyw43_arch_lwip_sys_freertos
