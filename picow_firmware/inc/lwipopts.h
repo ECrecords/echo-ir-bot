@@ -7,7 +7,7 @@
 
 #define NO_SYS                      0
 
-#define LWIP_SOCKET                 1
+#define LWIP_SOCKET                 0
 
 #if PICO_CYW43_ARCH_POLL
 #define MEM_LIBC_MALLOC             1
@@ -30,9 +30,11 @@
 #define LWIP_SO_RCVTIMEO 1
 #endif
 
+#if LWIP_SOCKET
 #define DEFAULT_UDP_RECVMBOX_SIZE TCPIP_MBOX_SIZE
 #define DEFAULT_TCP_RECVMBOX_SIZE TCPIP_MBOX_SIZE
 #define DEFAULT_ACCEPTMBOX_SIZE TCPIP_MBOX_SIZE
+#endif
 
 #define MEM_ALIGNMENT               4
 #define MEM_SIZE                    4000
@@ -87,7 +89,7 @@
 #define MEM_DEBUG                   LWIP_DBG_OFF
 #define MEMP_DEBUG                  LWIP_DBG_OFF
 #define SYS_DEBUG                   LWIP_DBG_OFF
-#define TCP_DEBUG                   LWIP_DBG_OFF
+#define TCP_DEBUG                   LWIP_DBG_ON
 #define TCP_INPUT_DEBUG             LWIP_DBG_OFF
 #define TCP_OUTPUT_DEBUG            LWIP_DBG_OFF
 #define TCP_RTO_DEBUG               LWIP_DBG_OFF

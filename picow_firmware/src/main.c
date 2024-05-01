@@ -6,8 +6,8 @@
 #include "stdlib.h"
 
 #include "lwipopts.h"
-#include "lwip/tcp.h"
-#include "lwip/sockets.h"
+#include "lwip/udp.h"
+#include "lwip/ip.h"
 #include "lwip/ip_addr.h"
 #include "lwip/netif.h"
 
@@ -17,7 +17,7 @@
 #include "task.h"
 #include "queue.h"
 
-#define SERVER_ADDR "192.168.0.163"
+#define SERVER_ADDR "192.168.0.181"
 #define SERVER_PORT 8008
 
 #define SPI_RX spi1
@@ -51,34 +51,44 @@ static int rx_channel;
 static data_t dma_data;
 static QueueHandle_t rx_queue;
 
-void SendDataToServer(RadarData_t *rx_data)
-{
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+void SendDataToServer(RadarData_t *rx_data) {
+    struct udp_pcb *pcb;
+    struct pbuf *p;
+    ip_addr_t server_ip;
+    err_t err;
 
-    if (sockfd < 0)
-    {
-        printf("Failed to create socket\n");
+    // Create new UDP control block
+    pcb = udp_new();
+    if (!pcb) {
+        printf("Failed to create UDP PCB\n");
         return;
     }
 
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
-    server_addr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+    // Define the remote IP address and port
+    IP4_ADDR(&server_ip, 192, 168, 0, 181);  // Server IP and port
 
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
-    {
-        printf("Failed to connect to server\n");
+    // Allocate pbuf (memory for packet)
+    p = pbuf_alloc(PBUF_TRANSPORT, sizeof(RadarData_t), PBUF_RAM);
+    if (!p) {
+        printf("Failed to allocate pbuf\n");
+        udp_remove(pcb);  // Clean up the PCB if pbuf allocation fails
         return;
     }
 
-    char buff[256];
+    // Copy radar data to pbuf
+    memcpy(p->payload, rx_data, sizeof(RadarData_t));
 
-    sprintf(buff, "distance: %d, angle: %d", rx_data->distance, rx_data->angle);
+    // Send UDP packet
+    err = udp_sendto(pcb, p, &server_ip, SERVER_PORT);
+    if (err != ERR_OK) {
+        printf("Failed to send UDP packet\n");
+    }
 
-    send(sockfd, buff, strlen(buff), 0);
+    // Free the pbuf
+    pbuf_free(p);
 
-    close(sockfd);
+    // Clean up the UDP control block
+    udp_remove(pcb);
 }
 
 void ConfigWifi(void *pvParameters)
