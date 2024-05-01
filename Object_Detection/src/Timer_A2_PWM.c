@@ -5,6 +5,11 @@
  * This file contains the function definitions for configuring Timer A2 in Pulse Width Modulation (PWM) mode.
  * It provides functions for initializing the PWM timer, updating duty cycles for PWM signals, and controlling
  * the PWM output on specific pins.
+ * 
+ * For MG995 servos, 
+ *  - MG995 PWM             (Orange)    <-->  MSP432 LaunchPad Pin P5.6
+ *  - MG995 VCC             (Red)       <-->  MSP432 LaunchPad VCC (5.0V)
+ *  - MG995 GND             (Brown)     <-->  MSP432 LaunchPad GND
  *
  * @author Aaron Nanas
  *
@@ -12,22 +17,25 @@
 
 #include "../inc/Timer_A2_PWM.h"
 
-void Timer_A2_PWM_Init(uint16_t period_constant, uint16_t duty_cycle_1, uint16_t duty_cycle_2)
+void Timer_A2_PWM_Init(uint16_t period_constant, uint16_t duty_cycle_1, uint16_t duty_cycle_2, uint16_t duty_cycle_3)
 {
     // Return immediately if either duty cycle values are greater than
     // or equal to the given period_constant
     if (duty_cycle_1 >= period_constant) return;
     if (duty_cycle_2 >= period_constant) return;
 
-    // Configure pins P5.6 (PM_TA2.1) and P5.7 (PM_TA2.2) to use the primary module function
+    // Configure pins P5.6 (PM_TA2.1), P5.7 (PM_TA2.2) and P6.6 (PM_TA2.3) to use the primary module function
     // by setting Bits 6 and 7 in the SEL0 register for P5
     // and clearing Bits 6 and 7 in the SEL1 register for P5
     P5->SEL0 |= 0xC0;
     P5->SEL1 &= ~0xC0;
+    P6->SEL0 |= 0x40;
+    P6->SEL1 &= ~0x40;
 
     // Configure pins P5.6 and P5.7 as output GPIO pins to drive the PWM signals
     // Set Bits 6 and 7 in the DIR register for P5
     P5->DIR |= 0xC0;
+    P6->DIR |= 0x40;
 
     // Set the Timer A2 Capture/Compare register to the specified period_constant
     // CCR[0] is primarily used as the "period" register
@@ -48,13 +56,21 @@ void Timer_A2_PWM_Init(uint16_t period_constant, uint16_t duty_cycle_1, uint16_t
     // Duty Cycle %: duty_cycle_1 / period_constant
     TIMER_A2->CCR[1] = duty_cycle_1;
 
-    // Configure the output mode as Toggle / Reset for CCR[2]
-    // Set the bits of the OUTMOD field of the CCTL[2] register to 010b
-    TIMER_A2->CCTL[2] |= 0x0040;
+    // // Configure the output mode as Toggle / Reset for CCR[2]
+    // // Set the bits of the OUTMOD field of the CCTL[2] register to 010b
+    // TIMER_A2->CCTL[2] |= 0xC110;
 
-    // Assign the value of duty_cycle_1 to the CCR[2] register
+    // // Assign the value of duty_cycle_1 to the CCR[2] register
+    // // Duty Cycle %: duty_cycle_2 / period_constant
+    // TIMER_A2->CCR[2] = duty_cycle_2;
+
+    // Configure the output mode as Toggle / Reset for CCR[3]
+    // Set the bits of the OUTMOD field of the CCTL[3] register to 010b
+    TIMER_A2->CCTL[3] |= 0x0040;
+
+    // Assign the value of duty_cycle_1 to the CCR[3] register
     // Duty Cycle %: duty_cycle_2 / period_constant
-    TIMER_A2->CCR[2] = duty_cycle_2;
+    TIMER_A2->CCR[3] = duty_cycle_3;
 
     // Modify the following bits in the CTL register
     // Select SMCLK = 12 MHz as timer clock source
@@ -74,9 +90,9 @@ void Timer_A2_Update_Duty_Cycle_1(uint16_t duty_cycle_1)
 
 void Timer_A2_Update_Duty_Cycle_2(uint16_t duty_cycle_2)
 {
-    // Immediately return if duty cycle is greater than the given period
-    if (duty_cycle_2 >= TIMER_A2->CCR[0]) return;
+    // // Immediately return if duty cycle is greater than the given period
+    // if (duty_cycle_2 >= TIMER_A2->CCR[0]) return;
 
-    // Otherwise, update the duty cycle
-    TIMER_A2->CCR[2] = duty_cycle_2;
+    // // Otherwise, update the duty cycle
+    // TIMER_A2->CCR[2] = duty_cycle_2;
 }
