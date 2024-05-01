@@ -18,6 +18,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <math.h>
 #include "msp.h"
 #include "inc/Clock.h"
@@ -27,8 +28,9 @@
 #include "inc/Motor.h"
 #include "inc/SysTick_Interrupt.h"
 #include "inc/Timer_A1_Interrupt.h"
-#include "inc/Timer_A2_PWM.h"
+
 #include "inc/US_100_UART.h"
+#include "inc/Servo.h"
 
 //#define CONTROLLER_1    1
 #define CONTROLLER_2    1
@@ -124,6 +126,8 @@ void Timer_A2_Periodic_Task(void)
     printf("pulse_duration : %5d \n", pulse_duration);
 }
 
+
+
 uint16_t Get_Distance()
 {
     char US_100_UART_Buffer[US_100_UART_BUFFER_SIZE] = {0};
@@ -137,6 +141,78 @@ uint16_t Get_Distance()
     // Clock_Delay1ms(20);
     return distance_value;
 }
+
+typedef struct {
+    uint16_t distance;
+    uint16_t angle;
+} measurment_t;
+
+measurment_t Full_Scan_Min_Distance() {
+    static bool count_down = false;
+    static uint16_t angle = 0; 
+
+    const int step = 10;
+    uint16_t min_distance = UINT16_MAX;
+    uint16_t angle_for_min_distance = 0;
+
+    while (1) {
+        if (count_down) {
+            if (angle == 0) {
+                count_down = false;
+                break;
+            }
+            angle-=step;
+        } else {
+            if (angle == 270) {
+                count_down = true;
+                break;
+
+            }
+            angle+=step;
+        }
+
+        Servo_SetAngle(angle);
+        uint16_t current_distance = Get_Distance();
+        printf("Angle: %d, Distance: %d mm\n", angle, current_distance);
+        if (current_distance < min_distance) {
+            min_distance = current_distance;
+            angle_for_min_distance = angle;
+        }
+        Clock_Delay1ms(10);  // Delay to allow servo to move and settle
+    }
+
+//    Servo_SetAngle(angle_for_min_distance); // Point to the closest object
+    measurment_t res = {min_distance, angle_for_min_distance};
+    return res;
+}
+
+// PID controller variables
+float integral = 0;
+float previous_error = 0;
+
+uint16_t PID_Controller(int desired_distance, int measured_distance) {
+    float kp = 0.5;   // Proportional gain
+//    float ki = 0.01;  // Integral gain
+//    float kd = 0.05;  // Derivative gain
+
+    // Calculate error
+    float error = desired_distance - measured_distance;
+
+    // Integral term calculation
+    integral += error;
+
+    // Derivative term calculation
+    float derivative = error - previous_error;
+
+    // Calculate PID output
+    uint16_t output = (uint16_t)(kp * error); // + ki * integral + kd * derivative);
+
+    // Update previous error
+    previous_error = error;
+
+    return output;
+}
+
 
 int main(void)
 {
@@ -169,33 +245,30 @@ int main(void)
     // Timer_A2_Interrupt_Init(&Timer_A2_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
 
     
-    // Initialize Timer A2 with a period of 50 Hz
-    // Timer A2 will be used to drive two servos
-    Timer_A2_PWM_Init(TIMER_A2_PERIOD_CONSTANT, 0, 0, 30);
+    // Initialize the Servo motor
+    Servo_Init();
 
     // Enable the interrupts used by Timer A1 and other modules
     EnableInterrupts();
 
-    int i = START_MOTOR_PWM;
-    uint16_t STEP_MOTOR_PWM = 250;
+    while(1) {
+        measurment_t min_mes = Full_Scan_Min_Distance();  // Find closest object once initially
 
-    while(1)
-    {
-        for (; i <= FINISH_MOTOR_PWD; i += STEP_MOTOR_PWM)
-        {
-            Timer_A2_Update_Duty_Cycle_1(i);
-            uint16_t distance_value = Get_Distance();
-            int angle = (i - 4000) / 250 * 6;
-            printf("Angle : %5d  Distance: %d mm\n", angle, distance_value);
-            Clock_Delay1ms(30);
-        }
-        for (; i >= START_MOTOR_PWM; i -= STEP_MOTOR_PWM)
-        {
-            Timer_A2_Update_Duty_Cycle_1(i);
-            uint16_t distance_value = Get_Distance();
-            int angle = (i - 4000) / 250 * 6;
-            printf("Angle : %5d  Distance: %d mm\n", angle, distance_value);
-            Clock_Delay1ms(30);
-        }
+        uint16_t duty_cycle_adjustment = PID_Controller(DESIRED_DISTANCE, min_mes);
+
+        // Adjust motor speed based on PID output
+        Duty_Cycle_Left = PWM_NOMINAL + duty_cycle_adjustment;
+        Duty_Cycle_Right = PWM_NOMINAL - duty_cycle_adjustment;
+
+        // Apply the duty cycle to the motors
+        Motor_Forward(Duty_Cycle_Left, Duty_Cycle_Right);
+        printf("Left: %d, Right: %d\n", Duty_Cycle_Left, Duty_Cycle_Right);
+        printf("Duty Cycle Adjustment: %d\n", duty_cycle_adjustment);
+
+        printf("Following object at angle %d with distance %d mm\n", min_mes.angle, min_mes.distance);
+        Clock_Delay1ms(1000);
+        Motor_Stop();
+
+        // Clock_Delay1ms(50);  // Adjust the frequency of control adjustments
     }
 }

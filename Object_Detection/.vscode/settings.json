@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "cortexm.h": "c",
+        "eusci_a0_uart.h": "c",
+        "eusci_b1_i2c.h": "c",
+        "picow_i2c_slave_.h": "c"
+    }
+}

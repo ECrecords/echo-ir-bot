@@ -12,6 +12,8 @@
  *  - MG995 GND             (Brown)     <-->  MSP432 LaunchPad GND
  *
  * @author Aaron Nanas
+ * @modified by: Hong Shen
+ * @date 2024-05-01
  *
  */
 
