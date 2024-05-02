@@ -42,6 +42,7 @@
 #define TOO_CLOSE_DISTANCE  200
 #define TOO_FAR_DISTANCE    500
 #define DESIRED_DISTANCE    250
+#define DESIRED_ANGLE       270 >> 1
 
 // Initialize constant PWM duty cycle values for the motors
 #define PWM_NOMINAL         4000
@@ -190,27 +191,30 @@ measurment_t Full_Scan_Min_Distance() {
 float integral = 0;
 float previous_error = 0;
 
-uint16_t PID_Controller(int desired_distance, int measured_distance) {
-    float kp = 0.5;   // Proportional gain
-//    float ki = 0.01;  // Integral gain
-//    float kd = 0.05;  // Derivative gain
+float kp_distance = 0.5;
+float kp_angle = 15.0;
 
-    // Calculate error
-    float error = desired_distance - measured_distance;
+void PID_Controller(measurment_t des, measurment_t mes) {
+    // Error calculations
+    float error_distance = des.distance - mes.distance;
+    float error_angle = des.angle - mes.angle;
 
-    // Integral term calculation
-    integral += error;
+    // Proportional control for distance and angle
+    int adjustment_distance = (int)(kp_distance * error_distance);
+    int adjustment_angle = (int)(kp_angle * error_angle);
 
-    // Derivative term calculation
-    float derivative = error - previous_error;
+    // Combine adjustments for differential drive
+    // Assuming the robot needs to decrease the angle error by turning towards the target
+    Duty_Cycle_Left = PWM_NOMINAL + adjustment_distance + adjustment_angle;
+    Duty_Cycle_Right = PWM_NOMINAL + adjustment_distance - adjustment_angle;
 
-    // Calculate PID output
-    uint16_t output = (uint16_t)(kp * error); // + ki * integral + kd * derivative);
+    // Ensure motor speeds remain within allowable range
+    Duty_Cycle_Left = fmax(PWM_MIN, fmin(Duty_Cycle_Left, PWM_MAX));
+    Duty_Cycle_Right = fmax(PWM_MIN, fmin(Duty_Cycle_Right, PWM_MAX));
 
-    // Update previous error
-    previous_error = error;
+    printf("Left: %d, Right: %d\n", Duty_Cycle_Left, Duty_Cycle_Right);
+    Motor_Forward(Duty_Cycle_Left, Duty_Cycle_Right);
 
-    return output;
 }
 
 
@@ -251,21 +255,13 @@ int main(void)
     // Enable the interrupts used by Timer A1 and other modules
     EnableInterrupts();
 
+    measurment_t set_point = {DESIRED_DISTANCE, DESIRED_ANGLE};
+
     while(1) {
-        measurment_t min_mes = Full_Scan_Min_Distance();  // Find closest object once initially
+        measurment_t mes = Full_Scan_Min_Distance();  // Find closest object once initially
 
-        uint16_t duty_cycle_adjustment = PID_Controller(DESIRED_DISTANCE, min_mes);
-
-        // Adjust motor speed based on PID output
-        Duty_Cycle_Left = PWM_NOMINAL + duty_cycle_adjustment;
-        Duty_Cycle_Right = PWM_NOMINAL - duty_cycle_adjustment;
-
-        // Apply the duty cycle to the motors
-        Motor_Forward(Duty_Cycle_Left, Duty_Cycle_Right);
-        printf("Left: %d, Right: %d\n", Duty_Cycle_Left, Duty_Cycle_Right);
-        printf("Duty Cycle Adjustment: %d\n", duty_cycle_adjustment);
-
-        printf("Following object at angle %d with distance %d mm\n", min_mes.angle, min_mes.distance);
+        PID_Controller(set_point, mes);
+        printf("Following object at angle %d with distance %d mm\n", mes.angle, mes.distance);
         Clock_Delay1ms(1000);
         Motor_Stop();
 
