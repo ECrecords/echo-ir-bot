@@ -48,16 +48,6 @@
 #define START_MOTOR_PWM     1250
 #define FINISH_MOTOR_PWD    6500
 
-// Declare global variables used to store filtered distance values from the Analog Distance Sensor
-uint32_t Filtered_Distance_Left;
-uint32_t Filtered_Distance_Center;
-uint32_t Filtered_Distance_Right;
-
-// Declare global variables used to store converted distance values from the Analog Distance Sensor
-int32_t Converted_Distance_Left;
-int32_t Converted_Distance_Center;
-int32_t Converted_Distance_Right;
-
 // Declare global variable used to store the amount of error
 int32_t Error;
 
@@ -132,9 +122,7 @@ uint16_t Get_Distance()
     US_100_UART_Buffer[1] = US_100_UART_InChar();
 
     uint16_t distance_value = US_100_UART_Buffer[1] | (US_100_UART_Buffer[0] << 8);
-    // printf("Distance: %d mm\n", distance_value);
 
-    // Clock_Delay1ms(20);
     return distance_value;
 }
 
@@ -144,10 +132,11 @@ typedef struct {
 } measurment_t;
 
 measurment_t Full_Scan_Min_Distance() {
+    const int step = 10;
+
     static bool count_down = false;
     static uint16_t angle = 0; 
 
-    const int step = 10;
     uint16_t min_distance = UINT16_MAX;
     uint16_t angle_for_min_distance = 0;
 
@@ -157,24 +146,29 @@ measurment_t Full_Scan_Min_Distance() {
                 count_down = false;
                 break;
             }
+
             angle-=step;
+
         } else {
             if (angle == 270) {
                 count_down = true;
                 break;
 
             }
+
             angle+=step;
         }
 
+
         Servo_SetAngle(angle);
+
         uint16_t current_distance = Get_Distance();
 
         if (current_distance < min_distance) {
             min_distance = current_distance;
             angle_for_min_distance = angle;
         }
-        Clock_Delay1ms(10);  // Delay to allow servo to move and settle
+        Clock_Delay1ms(2);
     }
 
     measurment_t res = {min_distance, angle_for_min_distance};
@@ -185,8 +179,8 @@ measurment_t Full_Scan_Min_Distance() {
 float integral = 0;
 float previous_error = 0;
 
-float kp_distance = 0.5;
-float kp_angle = 15.0;
+float kp_distance = 3;
+float kp_angle = 7;
 
 void PID_Controller(measurment_t des, measurment_t mes) {
     // Error calculations
@@ -210,11 +204,6 @@ void PID_Controller(measurment_t des, measurment_t mes) {
     Motor_Forward(Duty_Cycle_Left, Duty_Cycle_Right);
 
 }
-
-void vApplicationIdleHook(void){
-    while(1);
-}
-
 
 int main(void)
 {
@@ -244,8 +233,6 @@ int main(void)
     // Initialize Timer A1 with interrupts enabled and an interrupt rate of 2 kHz
     Timer_A1_Interrupt_Init(&Timer_A1_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
 
-    // Timer_A2_Interrupt_Init(&Timer_A2_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
-
 
     // Initialize the Servo motor
     Servo_Init();
@@ -260,7 +247,5 @@ int main(void)
 
         PID_Controller(set_point, mes);
         printf("Following object at angle %d with distance %d mm\n", mes.angle, mes.distance);
-        Clock_Delay1ms(1000);
-        Motor_Stop();
     }
 }
