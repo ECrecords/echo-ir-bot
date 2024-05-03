@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
+
 #include "msp.h"
 #include "inc/Clock.h"
 #include "inc/CortexM.h"
@@ -31,12 +32,6 @@
 
 #include "inc/US_100_UART.h"
 #include "inc/Servo.h"
-
-//#define CONTROLLER_1    1
-#define CONTROLLER_2    1
-//#define CONTROLLER_3    1
-
-//#define DEBUG_ACTIVE    1
 
 // Initialize constant distance values (in mm)
 #define TOO_CLOSE_DISTANCE  200
@@ -174,7 +169,7 @@ measurment_t Full_Scan_Min_Distance() {
 
         Servo_SetAngle(angle);
         uint16_t current_distance = Get_Distance();
-        printf("Angle: %d, Distance: %d mm\n", angle, current_distance);
+
         if (current_distance < min_distance) {
             min_distance = current_distance;
             angle_for_min_distance = angle;
@@ -182,7 +177,6 @@ measurment_t Full_Scan_Min_Distance() {
         Clock_Delay1ms(10);  // Delay to allow servo to move and settle
     }
 
-//    Servo_SetAngle(angle_for_min_distance); // Point to the closest object
     measurment_t res = {min_distance, angle_for_min_distance};
     return res;
 }
@@ -217,6 +211,10 @@ void PID_Controller(measurment_t des, measurment_t mes) {
 
 }
 
+void vApplicationIdleHook(void){
+    while(1);
+}
+
 
 int main(void)
 {
@@ -248,7 +246,7 @@ int main(void)
 
     // Timer_A2_Interrupt_Init(&Timer_A2_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
 
-    
+
     // Initialize the Servo motor
     Servo_Init();
 
@@ -264,7 +262,5 @@ int main(void)
         printf("Following object at angle %d with distance %d mm\n", mes.angle, mes.distance);
         Clock_Delay1ms(1000);
         Motor_Stop();
-
-        // Clock_Delay1ms(50);  // Adjust the frequency of control adjustments
     }
 }
