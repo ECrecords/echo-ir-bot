@@ -22,6 +22,8 @@
 
 // Periodic interrupt rate of 2 kHz for the Tachometer / ADC Lab
 #define TIMER_A1_INT_CCR0_VALUE 6000
+#define TIMER_A1_INT_CCR0_VALUE_1HZ 12000000
+#define TIMER_A1_INT_CCR0_VALUE_0_5HZ 24000000
 
 // Declare pointer to the user-defined function
 void (*Timer_A1_Task)(void);
