@@ -33,6 +33,7 @@
 #include "inc/US_100_UART.h"
 #include "inc/Servo.h"
 
+#include "EUSCI_B0_SPI.h"
 // Initialize constant distance values (in mm)
 #define TOO_CLOSE_DISTANCE  200
 #define TOO_FAR_DISTANCE    500
@@ -242,10 +243,15 @@ int main(void)
 
     measurment_t set_point = {DESIRED_DISTANCE, DESIRED_ANGLE};
 
-    while(1) {
-        measurment_t mes = Full_Scan_Min_Distance();  // Find closest object once initially
+    EUSCI_B0_SPI_Init();
 
-        PID_Controller(set_point, mes);
-        printf("Following object at angle %d with distance %d mm\n", mes.angle, mes.distance);
+    while(1) {
+//        measurment_t mes = Full_Scan_Min_Distance();  // Find closest object once initially
+//
+//        PID_Controller(set_point, mes);
+//        printf("Following object at angle %d with distance %d mm\n", mes.angle, mes.distance);
+        EUSCI_B0_SPI_Send_A_Byte(0xAA);
+        Clock_Delay1ms(500);
+
     }
 }
