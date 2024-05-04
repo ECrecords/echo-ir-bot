@@ -32,7 +32,7 @@ void EUSCIB0_IRQHandler(void) {
 void EUSCI_B0_SPI_Init()
 {
     // Hold the EUSCI_B0 module in reset mode
-    EUSCI_B0_SPI->CTLW0 |= 0x0001
+    EUSCI_B0_SPI->CTLW0 |= 0x0001;
 
     //     CTWL0 Register Configuration
     //
@@ -58,23 +58,27 @@ void EUSCI_B0_SPI_Init()
     // N = 12
     EUSCI_B0_SPI->BRW = 12;
 
-    // Configre pins P1.5 (CLK), P1.6 (SIMO), P1.7 (SOMI), and P5.2 (STE)
+    // Configure pins P1.5 (CLK), P1.6 (SIMO), P1.7 (SOMI), 
     P1->SEL0 |= 0xE0;
     P1->SEL1 &= ~0xE0;
     P1->DIR |= 0xE0;
 
-    P5->SEL0 |= 0x04;
+    // UCB0STE pin not exposed on the LaunchPad
+    // Will use P5.2 as the CS pin
+    P5->SEL0 &= ~0x04;
     P5->SEL1 &= ~0x04;
     P5->DIR |= 0x04;
 
+    // Set the priority of the EUSCI_B0 interrupt to the lowest priority
+    // by setting Bits 7-5 of the NVIC_IPR5 register
+    NVIC->IP[5] = (NVIC->IP[5] & 0xFFFFFF00) | 0x00000040;
+
+    // Enable Interrupt 20 in NVIC by setting Bit 20 of the ISER register
+    NVIC->ISER[0] |= 0x00100000;
+
     // Enable receive interrupt but disable transmit interrupt
-    EUSCI_B0_SPI->IE = 0x0001;
-
-    // Set the priority of the EUSCI_B0 interrupt to 2
-    NVIC->IP[5] = (NVIC->IP[5] & 0xFFFFF1FF) | 0x00000040;
-
-    // Enable the interrupt in the NVIC
-   NVIC->ISER[0] |= 0x00100000;
+    EUSCI_B0_SPI->IE |= 0x0001;
+    EUSCI_B0_SPI->IE |= 0x0002;
     
     //  Release the EUSCI_B0 module from reset
     EUSCI_B0_SPI->CTLW0 &= ~0x0001;
@@ -83,12 +87,16 @@ void EUSCI_B0_SPI_Init()
 void EUSCI_B0_SPI_Send_A_Byte(uint8_t data)
 {
     // Wait until the transmit buffer is empty
-    while((EUSCI_B0->IFG & 0x0002) == 0);
+    while((EUSCI_B0_SPI->STATW & 0x0001) != 0x0000);
+
+    P5->OUT &= ~0x04;
 
     // Write the data to the TX buffer
     EUSCI_B0->TXBUF = data;
 
     // Wait until the transmit buffer is empty
-    while((EUSCI_B0->IFG & 0x0002) == 0);
+    while((EUSCI_B0_SPI->STATW & 0x0001) != 0x0000);
+
+    P5->OUT |= 0x04;
 }
 

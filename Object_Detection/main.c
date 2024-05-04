@@ -33,7 +33,7 @@
 #include "inc/US_100_UART.h"
 #include "inc/Servo.h"
 
-#include "EUSCI_B0_SPI.h"
+#include "inc/EUSCI_B0_SPI.h"
 // Initialize constant distance values (in mm)
 #define TOO_CLOSE_DISTANCE  200
 #define TOO_FAR_DISTANCE    500
@@ -239,19 +239,23 @@ int main(void)
     Servo_Init();
 
     // Enable the interrupts used by Timer A1 and other modules
-    EnableInterrupts();
 
     measurment_t set_point = {DESIRED_DISTANCE, DESIRED_ANGLE};
 
     EUSCI_B0_SPI_Init();
 
+    EnableInterrupts();
+    
     while(1) {
 //        measurment_t mes = Full_Scan_Min_Distance();  // Find closest object once initially
 //
 //        PID_Controller(set_point, mes);
 //        printf("Following object at angle %d with distance %d mm\n", mes.angle, mes.distance);
-        EUSCI_B0_SPI_Send_A_Byte(0xAA);
-        Clock_Delay1ms(500);
+
+
+        EUSCI_B0_SPI_Send_A_Byte((uint8_t)'!');
+
+        Clock_Delay1ms(5);
 
     }
 }
