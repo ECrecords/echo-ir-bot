@@ -26,8 +26,9 @@ async fn picow_listener(addr: String, running_samples: Arc<Mutex<Samples>>) {
 
     // print data received from picow
     loop {
-        let mut buffer = [0; 1024];
+        let mut buffer = [0; 8];
         let _ = socket.recv_from(&mut buffer).await.unwrap();
+
         let distance = u32::from_be_bytes([buffer[7], buffer[6], buffer[5], buffer[4]]);
         let angle = u32::from_be_bytes([buffer[3], buffer[2], buffer[1], buffer[0]]);
 
@@ -50,6 +51,7 @@ async fn picow_listener(addr: String, running_samples: Arc<Mutex<Samples>>) {
 
 async fn data(State(samples): State<Arc<Mutex<Samples>>>) -> Json<Samples> {
     let lock = samples.lock().unwrap();
+    
     Json(Samples {
         distance: lock.distance.clone(),
         angle: lock.angle.clone(),
