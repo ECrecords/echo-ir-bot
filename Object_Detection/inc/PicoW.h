@@ -12,6 +12,8 @@
 
 void PicoW_Init();
 
-void PicoW_Transmit_Data();
+void PicoW_Transmit_Byte(uint8_t data) ;
+
+void PicoW_Transmit_Bytes(int n, uint8_t *mes);
 
 #endif /* INC_PICOW_C_ */

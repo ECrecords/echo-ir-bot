@@ -32,8 +32,8 @@
 
 #include "inc/US_100_UART.h"
 #include "inc/Servo.h"
+#include "inc/PicoW.h"
 
-#include "inc/EUSCI_B0_SPI.h"
 // Initialize constant distance values (in mm)
 #define TOO_CLOSE_DISTANCE  200
 #define TOO_FAR_DISTANCE    500
@@ -210,6 +210,18 @@ void PID_Controller(measurment_t des, measurment_t mes) {
 
 }
 
+typedef struct RadarData_
+{
+    uint32_t distance;
+    uint32_t angle;
+} RadarData_t;
+
+typedef union
+{
+    uint8_t buff[8];
+    RadarData_t rd;
+} data_t;
+
 int main(void)
 {
     // Initialize the 48 MHz Clock
@@ -222,7 +234,8 @@ int main(void)
     EUSCI_A0_UART_Init_Printf();
 
     // Initialize the DC motors
-    Motor_Init();
+//    Motor_Init();
+
 
     // Initialize the US-100 Ultrasonic Distance Sensor module
     US_100_UART_Init();
@@ -241,31 +254,33 @@ int main(void)
 
     // Initialize the Servo motor
     Servo_Init();
+    PicoW_Init();
 
     // Enable the interrupts used by Timer A1 and other modules
-
-    
-
-    EUSCI_B0_SPI_Init();
-
-    EnableInterrupts();
-
-    
-
-    EUSCI_B0_SPI_Init();
-
     EnableInterrupts();
     
-    while(1) {
+    Motor_Stop();
+
+//    while(1) {
 //        measurment_t mes = Full_Scan_Min_Distance();  // Find closest object once initially
 //
 //        PID_Controller(set_point, mes);
 //        printf("Following object at angle %d with distance %d mm\n", mes.angle, mes.distance);
 
 
-        EUSCI_B0_SPI_Send_A_Byte((uint8_t)'!');
+        data_t mes;
 
-        Clock_Delay1ms(5);
+        mes.rd.angle = 0;
+        mes.rd.distance = 0;
 
-    }
+        while(1) {
+
+            PicoW_Transmit_Bytes(8, mes.buff);
+
+            mes.rd.angle++;
+            mes.rd.distance++;
+
+            Clock_Delay1ms(500);
+        }
+//    }
 }
