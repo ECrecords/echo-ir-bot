@@ -71,15 +71,16 @@ void EUSCI_B0_SPI_Init()
 
     // Set the priority of the EUSCI_B0 interrupt to the lowest priority
     // by setting Bits 7-5 of the NVIC_IPR5 register
-    NVIC->IP[5] = (NVIC->IP[5] & 0xFFFFFF00) | 0x00000040;
+    NVIC->IP[EUSCIB0_IRQn] = (NVIC->IP[EUSCIB0_IRQn] & 0xFFFFFF00) | 0x00000040;
 
     // Enable Interrupt 20 in NVIC by setting Bit 20 of the ISER register
-    NVIC->ISER[0] |= 0x00100000;
+    NVIC->ISER[0] |= 1 << EUSCIB0_IRQn;
 
     // Enable receive interrupt but disable transmit interrupt
-    EUSCI_B0_SPI->IE |= 0x0001;
-    EUSCI_B0_SPI->IE |= 0x0002;
+    printf("IE: 0x%p", EUSCI_B0_SPI);
     
+    EUSCI_B1_SPI->IE |= 0x0003;
+
     //  Release the EUSCI_B0 module from reset
     EUSCI_B0_SPI->CTLW0 &= ~0x0001;
 }
