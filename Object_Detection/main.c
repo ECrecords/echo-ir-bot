@@ -62,6 +62,12 @@ int32_t Set_Point = 250;
 uint16_t Duty_Cycle_Left;
 uint16_t Duty_Cycle_Right;
 
+typedef struct {
+    uint16_t distance;
+    uint16_t angle;
+} measurment_t;
+
+measurment_t mes;
 
 /**
  * @brief This function is the handler for the SysTick periodic interrupt with a rate of 100 Hz.
@@ -91,6 +97,8 @@ void SysTick_Handler(void)
 void Timer_A1_Periodic_Task(void)
 {
     // this is where we would sample the sensors
+    measurment_t set_point = {DESIRED_DISTANCE, DESIRED_ANGLE};
+    PID_Controller(set_point, mes);
 }
 
 /**
@@ -106,11 +114,11 @@ void Timer_A1_Periodic_Task(void)
 void Timer_A2_Periodic_Task(void)
 {
     // this is where we would sample the sensors
-    static uint16_t last_capture = 0;
-    uint16_t capture = TIMER_A0->CCR[1];
-    uint16_t pulse_duration = capture - last_capture;
-    last_capture = capture;
-    printf("pulse_duration : %5d \n", pulse_duration);
+    // static uint16_t last_capture = 0;
+    // uint16_t capture = TIMER_A0->CCR[1];
+    // uint16_t pulse_duration = capture - last_capture;
+    // last_capture = capture;
+    // printf("pulse_duration : %5d \n", pulse_duration);
 }
 
 
@@ -127,10 +135,6 @@ uint16_t Get_Distance()
     return distance_value;
 }
 
-typedef struct {
-    uint16_t distance;
-    uint16_t angle;
-} measurment_t;
 
 measurment_t Full_Scan_Min_Distance() {
     const int step = 10;
@@ -164,7 +168,7 @@ measurment_t Full_Scan_Min_Distance() {
         Servo_SetAngle(angle);
 
         uint16_t current_distance = Get_Distance();
-
+        printf("distance : %d mm Angle : %d angle\n", current_distance, angle);
         if (current_distance < min_distance) {
             min_distance = current_distance;
             angle_for_min_distance = angle;
@@ -201,7 +205,7 @@ void PID_Controller(measurment_t des, measurment_t mes) {
     Duty_Cycle_Left = fmax(PWM_MIN, fmin(Duty_Cycle_Left, PWM_MAX));
     Duty_Cycle_Right = fmax(PWM_MIN, fmin(Duty_Cycle_Right, PWM_MAX));
 
-    printf("Left: %d, Right: %d\n", Duty_Cycle_Left, Duty_Cycle_Right);
+    // printf("Left: %d, Right: %d\n", Duty_Cycle_Left, Duty_Cycle_Right);
     Motor_Forward(Duty_Cycle_Left, Duty_Cycle_Right);
 
 }
@@ -232,7 +236,7 @@ int main(void)
     SysTick_Interrupt_Init(SYSTICK_INT_NUM_CLK_CYCLES, SYSTICK_INT_PRIORITY);
 
     // Initialize Timer A1 with interrupts enabled and an interrupt rate of 2 kHz
-    Timer_A1_Interrupt_Init(&Timer_A1_Periodic_Task, TIMER_A1_INT_CCR0_VALUE);
+    Timer_A1_Interrupt_Init(&Timer_A1_Periodic_Task, TIMER_A1_INT_CCR0_VALUE_1HZ);
 
 
     // Initialize the Servo motor
@@ -240,7 +244,13 @@ int main(void)
 
     // Enable the interrupts used by Timer A1 and other modules
 
-    measurment_t set_point = {DESIRED_DISTANCE, DESIRED_ANGLE};
+    
+
+    EUSCI_B0_SPI_Init();
+
+    EnableInterrupts();
+
+    
 
     EUSCI_B0_SPI_Init();
 
