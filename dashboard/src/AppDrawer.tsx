@@ -19,7 +19,7 @@ import RadarIcon from '@mui/icons-material/Radar';
 import { Button } from '@mui/material';
 
 
-import SimpleLineChart from './DisplayData';
+import DisplayData from './DisplayData';
 
 const drawerWidth = 240;
 
@@ -53,7 +53,7 @@ function AppDrawer() {
 
     fetchData();
 
-    const interval = setInterval(fetchData, 500);
+    const interval = setInterval(fetchData, 250);
 
     return () => clearInterval(interval);
   }, []);
@@ -122,7 +122,9 @@ function AppDrawer() {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Toolbar />
-        <SimpleLineChart distance={samples.distance} angle={samples.angle}/>
+        {selectedItem === 'Configurations' && <Typography paragraph>Configurations</Typography>}
+        {selectedItem === 'Data' && <DisplayData {...samples} />}
+        {selectedItem === 'Radar' && <Typography paragraph>Radar</Typography>}
       </Box>
     </Box>
   );
