@@ -51,7 +51,7 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
-    SPI_MASTER
+    # SPI_MASTER
 )
 
 target_link_libraries(${PROJECT_NAME}

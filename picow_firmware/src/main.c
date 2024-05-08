@@ -20,12 +20,12 @@
 #define SERVER_ADDR "192.168.0.181"
 #define SERVER_PORT 8008
 
-#define SPI_SLAVE spi1
+#define SPI_SLAVE spi0
 #define SPI_BAUD_RATE 1000 * 1000
-#define SPI_SLAVE_SCK 10
-#define SPI_SLAVE_MOSI 11
-#define SPI_SLAVE_MISO 12
-#define SPI_SLAVE_CS 13
+#define SPI_SLAVE_SCK 18
+#define SPI_SLAVE_MOSI 16
+#define SPI_SLAVE_MISO 19
+#define SPI_SLAVE_CS 17
 
 #ifdef SPI_MASTER
 #define SPI_TX spi0
@@ -43,13 +43,20 @@ typedef struct RadarData_
 
 typedef union
 {
-    uint8_t buff[8];
+    uint32_t buff[2];
     RadarData_t rd;
 } data_t;
 
 
 static int rx_channel;
-static int tx_channel;
+
+uint32_t flipEndianness(uint32_t value) {
+    return ((value >> 24) & 0x000000FF) | // Move byte 0 to byte 3
+           ((value << 8) & 0x00FF0000) | // Move byte 1 to byte 2
+           ((value >> 8) & 0x0000FF00) | // Move byte 2 to byte 1
+           ((value << 24) & 0xFF000000); // Move byte 3 to byte 0
+}
+
 static data_t dma_data;
 static QueueHandle_t rx_queue;
 
@@ -123,6 +130,7 @@ void ConfigWifi(void *pvParameters)
     while(1) {
         if (xQueueReceive(rx_queue, &rx_data, portMAX_DELAY) == pdTRUE)
         {
+            // printf("Distance: %d, Angle: %d\n", rx_data.distance, rx_data.angle);
             if (cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_JOIN){
                 SendDataToServer(&rx_data);
             }
@@ -148,7 +156,16 @@ void configure_spi_rx()
     gpio_set_function(SPI_SLAVE_MISO, GPIO_FUNC_SPI);
     gpio_set_function(SPI_SLAVE_CS, GPIO_FUNC_SPI);
 
-    spi_init(SPI_SLAVE, SPI_BAUD_RATE);
+    uint actual_baud = spi_init(SPI_SLAVE, SPI_BAUD_RATE);
+
+    if (actual_baud != SPI_BAUD_RATE)
+    {
+        printf("SPI baud rate %d requested, %d actual\n", SPI_BAUD_RATE, actual_baud);
+    } else {
+        printf("SPI baud rate %d\n", actual_baud);
+    }
+
+
     spi_set_format(SPI_SLAVE, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
     spi_set_slave(SPI_SLAVE, true);
 
@@ -156,7 +173,7 @@ void configure_spi_rx()
     dma_channel_config rx_c = dma_channel_get_default_config(rx_channel);
 
     // RX DMA configuration
-    channel_config_set_transfer_data_size(&rx_c, DMA_SIZE_8);
+    channel_config_set_transfer_data_size(&rx_c, DMA_SIZE_32);
     channel_config_set_dreq(&rx_c, spi_get_dreq(spi0, false));
     channel_config_set_read_increment(&rx_c, false);
     channel_config_set_write_increment(&rx_c, true);
@@ -213,7 +230,6 @@ int main()
     rx_queue = xQueueCreate(512, sizeof(RadarData_t));
 
     xTaskCreate(ConfigWifi, "ConfigWifi", 512, NULL, 1, NULL);
-    // xTaskCreate(xHandleReceive, "HandleReceive", 512, NULL, 1, NULL);
 
 #ifdef SPI_MASTER
     xTaskCreate(run_master, "RunMaster", 512, NULL, 1, NULL);
