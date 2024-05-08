@@ -20,12 +20,12 @@
 #define SERVER_ADDR "192.168.0.181"
 #define SERVER_PORT 8008
 
-#define SPI_RX spi1
+#define SPI_SLAVE spi1
 #define SPI_BAUD_RATE 1000 * 1000
-#define SPI_RX_SCK 10
-#define SPI_RX_MOSI 11
-#define SPI_RX_MISO 12
-#define SPI_RX_CS 13
+#define SPI_SLAVE_SCK 10
+#define SPI_SLAVE_MOSI 11
+#define SPI_SLAVE_MISO 12
+#define SPI_SLAVE_CS 13
 
 #ifdef SPI_MASTER
 #define SPI_TX spi0
@@ -47,7 +47,9 @@ typedef union
     RadarData_t rd;
 } data_t;
 
+
 static int rx_channel;
+static int tx_channel;
 static data_t dma_data;
 static QueueHandle_t rx_queue;
 
@@ -130,9 +132,8 @@ void ConfigWifi(void *pvParameters)
     cyw43_arch_deinit();
 }
 
-void tx_handle()
+void rx_handle()
 {
-
     xQueueSendFromISR(rx_queue, &dma_data.rd, NULL);
 
     dma_channel_acknowledge_irq0(rx_channel);
@@ -141,31 +142,32 @@ void tx_handle()
 
 void configure_spi_rx()
 {
-    gpio_init_mask((1 << SPI_RX_CS) | (1 << SPI_RX_MOSI) | (1 << SPI_RX_MISO) | (1 << SPI_RX_CS));
-    gpio_set_function(SPI_RX_SCK, GPIO_FUNC_SPI);
-    gpio_set_function(SPI_RX_MOSI, GPIO_FUNC_SPI);
-    gpio_set_function(SPI_RX_MISO, GPIO_FUNC_SPI);
-    gpio_set_function(SPI_RX_CS, GPIO_FUNC_SPI);
+    gpio_init_mask((1 << SPI_SLAVE_CS) | (1 << SPI_SLAVE_MOSI) | (1 << SPI_SLAVE_MISO) | (1 << SPI_SLAVE_CS));
+    gpio_set_function(SPI_SLAVE_SCK, GPIO_FUNC_SPI);
+    gpio_set_function(SPI_SLAVE_MOSI, GPIO_FUNC_SPI);
+    gpio_set_function(SPI_SLAVE_MISO, GPIO_FUNC_SPI);
+    gpio_set_function(SPI_SLAVE_CS, GPIO_FUNC_SPI);
 
-    spi_init(SPI_RX, SPI_BAUD_RATE);
-    spi_set_format(SPI_RX, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
-    spi_set_slave(SPI_RX, true);
+    spi_init(SPI_SLAVE, SPI_BAUD_RATE);
+    spi_set_format(SPI_SLAVE, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_slave(SPI_SLAVE, true);
 
     rx_channel = dma_claim_unused_channel(true);
-    dma_channel_config c = dma_channel_get_default_config(rx_channel);
+    dma_channel_config rx_c = dma_channel_get_default_config(rx_channel);
 
-    channel_config_set_transfer_data_size(&c, DMA_SIZE_8);
-    channel_config_set_dreq(&c, spi_get_dreq(spi0, false));
-    channel_config_set_read_increment(&c, false);
-    channel_config_set_write_increment(&c, true);
+    // RX DMA configuration
+    channel_config_set_transfer_data_size(&rx_c, DMA_SIZE_8);
+    channel_config_set_dreq(&rx_c, spi_get_dreq(spi0, false));
+    channel_config_set_read_increment(&rx_c, false);
+    channel_config_set_write_increment(&rx_c, true);
 
-    dma_channel_configure(rx_channel, &c,
+    dma_channel_configure(rx_channel, &rx_c,
                           dma_data.buff,
-                          &spi_get_hw(SPI_RX)->dr,
+                          &spi_get_hw(SPI_SLAVE)->dr,
                           8,
                           false);
 
-    irq_set_exclusive_handler(DMA_IRQ_0, tx_handle);
+    irq_set_exclusive_handler(DMA_IRQ_0, rx_handle);
     irq_set_enabled(DMA_IRQ_0, true);
     dma_channel_set_irq0_enabled(rx_channel, true);
 
