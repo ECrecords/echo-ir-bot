@@ -26,6 +26,48 @@
 
 #include "../inc/US_100_UART.h"
 
+static bool timeout_occured = false;
+
+
+/**
+ * @brief Timer32 Interrupt Service Routine (ISR) for Timer 32-1.
+ *
+ * Clears the Timer32-1 interrupt flag and sets the timeout_occurred flag.
+ */
+void T32_INT1_IRQHandler() {
+    // Clear Timer32 interrupt flag
+    TIMER32_1->INTCLR = 1;
+    timeout_occured = true;
+}
+
+/**
+ * @brief Initializes Timer32-1 in one-shot mode.
+ *
+ * Configures Timer32-1 for a one-shot countdown timer with interrupts enabled.
+ */
+void T32_1_Init() {
+    // Disable Timer32-1 before configuration
+    TIMER32_1->CONTROL &= ~TIMER32_CONTROL_ENABLE;
+
+    // Configure Timer32-1:
+    // Set up in one-shot mode,
+    // Enable 32-bit size,
+    // Enable interrupt,
+    // Set timer to periodic mode
+    TIMER32_1->CONTROL &= ~TIMER32_CONTROL_ONESHOT; // Set up in one-shot mode
+    TIMER32_1->CONTROL |= TIMER32_CONTROL_SIZE;    // Enable 32-bit size
+    TIMER32_1->CONTROL |= TIMER32_CONTROL_IE;      // Enable interrupt
+    TIMER32_1->CONTROL |= TIMER32_CONTROL_MODE;   // Set timer to periodic mode
+
+    // Load the TIMER32_1 timer with the value for 1 second delay at 12 MHz clock
+    TIMER32_1->LOAD = 12 * 1000 * 1000; // 12,000,000
+
+    NVIC->ISER[0] = 1 << T32_INT1_IRQn;
+
+    NVIC->IP[6] = (NVIC->IP[6] && ~(0x7 << 13)) | 0x4 << 13;
+}
+
+
 void US_100_UART_Init()
 {
     // Configure pins P9.6 (PM_UCA3RXD) and P9.7 (PM_UCA3TXD) to use the primary module function
@@ -88,15 +130,33 @@ void US_100_UART_Init()
     // Release the EUSCI_A3 module from the reset state by clearing the
     // UCSWRST bit (Bit 0) in the CTLW0 register
     EUSCI_A3->CTLW0 &= ~0x01;
+
+
+    T32_1_Init();
 }
 
 uint8_t US_100_UART_InChar()
 {
+    // Enable Timer32-1
+    TIMER32_1->CONTROL |= TIMER32_CONTROL_ENABLE;
+
     // Check the Receive Interrupt flag (UCRXIFG, Bit 0)
     // in the IFG register and wait if the flag is not set
     // If the UCRXIFG is set, then the Receive Buffer (UCAxRXBUF) has
     // received a complete character
-    while((EUSCI_A3->IFG & 0x01) == 0);
+    while((EUSCI_A3->IFG & 0x01) == 0) {
+        if (timeout_occured) {
+            break;
+        }
+    }
+
+    // Disable Timer32-1
+    TIMER32_1->CONTROL &= ~TIMER32_CONTROL_ENABLE;
+
+    if (timeout_occured) {
+        timeout_occured = false;
+        return UINT8_MAX;
+    }
 
     // Return the data from the Receive Buffer (UCAxRXBUF)
     // Reading the UCAxRXBUF will reset the UCRXIFG flag
@@ -105,10 +165,25 @@ uint8_t US_100_UART_InChar()
 
 void US_100_UART_OutChar(uint8_t data)
 {
+    // Enable Timer32-1
+    TIMER32_1->CONTROL |= TIMER32_CONTROL_ENABLE;
+
     // Check the Transmit Interrupt flag (UCTXIFG, Bit 1)
     // in the IFG register and wait if the flag is not set
     // If the UCTXIFG is set, then the Transmit Buffer (UCAxTXBUF) is empty
-    while((EUSCI_A3->IFG & 0x02) == 0);
+    while((EUSCI_A3->IFG & 0x02) == 0) {
+        if (timeout_occured) {
+            break;
+        }
+    }
+
+    // Disable Timer32-1
+    TIMER32_1->CONTROL &= ~TIMER32_CONTROL_ENABLE;
+
+    if (timeout_occured) {
+            timeout_occured = false;
+            return;
+        }
 
     // Write the data to the Transmit Buffer (UCAxTXBUF)
     // Writing to the UCAxTXBUF will clear the UCTXIFG flag
