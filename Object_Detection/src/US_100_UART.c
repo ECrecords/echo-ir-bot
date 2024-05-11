@@ -62,7 +62,7 @@ void T32_1_Init() {
     // Load the TIMER32_1 timer with the value for 1 second delay at 12 MHz clock
     TIMER32_1->LOAD = 12 * 1000 * 1000; // 12,000,000
 
-    NVIC->ISER[0] = 1 << T32_INT1_IRQn;
+    NVIC->ISER[0] |= 1 << T32_INT1_IRQn;
 
     NVIC->IP[6] = (NVIC->IP[6] && ~(0x7 << 13)) | 0x4 << 13;
 }
