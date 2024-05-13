@@ -20,6 +20,7 @@ import { Button } from '@mui/material';
 
 
 import DisplayData from './DisplayData';
+import RadarDisplay from './RadarDisplay';
 
 const drawerWidth = 240;
 
@@ -43,7 +44,7 @@ function AppDrawer() {
   React.useEffect( () => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:3000/data')   
+        const response = await fetch('http://192.168.0.181:3000/data')   
         const updateSamples = await response.json();
         setSamples(updateSamples);
       } catch (error) {
@@ -78,7 +79,7 @@ function AppDrawer() {
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <Typography variant="h6" noWrap component="div">
-            Clipped drawer
+            Radar Navagation
           </Typography>
         </Toolbar>
       </AppBar>
@@ -124,7 +125,7 @@ function AppDrawer() {
         <Toolbar />
         {selectedItem === 'Configurations' && <Typography paragraph>Configurations</Typography>}
         {selectedItem === 'Data' && <DisplayData {...samples} />}
-        {selectedItem === 'Radar' && <Typography paragraph>Radar</Typography>}
+        {selectedItem === 'Radar' && <RadarDisplay {...samples} />}
       </Box>
     </Box>
   );

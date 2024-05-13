@@ -37,6 +37,7 @@ static bool timeout_occured = false;
 void T32_INT1_IRQHandler() {
     // Clear Timer32 interrupt flag
     TIMER32_1->INTCLR = 1;
+    printf("UART TIMEOUT\n");
     timeout_occured = true;
 }
 
@@ -59,8 +60,8 @@ void T32_1_Init() {
     TIMER32_1->CONTROL |= TIMER32_CONTROL_IE;      // Enable interrupt
     TIMER32_1->CONTROL |= TIMER32_CONTROL_MODE;   // Set timer to periodic mode
 
-    // Load the TIMER32_1 timer with the value for 1 second delay at 12 MHz clock
-    TIMER32_1->LOAD = 12 * 1000 * 1000; // 12,000,000
+    // Load the TIMER32_1 timer with the value for 1 second delay at 48 MHz clock
+    TIMER32_1->LOAD = 48 * 1000 * 1000; // 12,000,000
 
     NVIC->ISER[0] |= 1 << T32_INT1_IRQn;
 

@@ -1,68 +1,76 @@
-// RadarDisplay.tsx
 import React, { useRef, useEffect } from 'react';
-
+import { light, dark } from 'ayu';
 interface RadarDisplayProps {
-    angle: number;    // Angle in degrees
-    distance: number; // Distance as a percentage of the radar's radius
+    distance: number[];
+    angle: number[];
 }
 
-const RadarDisplay: React.FC<RadarDisplayProps> = ({ angle, distance }) => {
+const RadarDisplay: React.FC<RadarDisplayProps> = ({ distance, angle }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
-        if (canvasRef.current) {
-            const canvas = canvasRef.current;
-            const context = canvas.getContext('2d');
-            if (context) {
-                drawRadar(context, angle, distance, canvas.width, canvas.height);
-            }
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const context = canvas.getContext('2d');
+        if (!context) return;
+
+        // Responsive canvas size
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxRadarRange = Math.min(width, height) / 2 - 20; // 20 pixels padding
+
+        context.clearRect(0, 0, width, height);
+
+        // Radar background
+        context.fillStyle = '#0000'; // light blue background
+        context.fillRect(0, 0, width, height);
+
+        // Draw concentric circles
+        for (let i = 1; i <= 5; i++) {
+            context.beginPath();
+            context.arc(centerX, centerY, (i * maxRadarRange) / 5, 0, 2 * Math.PI);
+            context.strokeStyle = '#bbb';
+            context.stroke();
         }
-    }, [angle, distance]);
 
-    // Draw function
-    const drawRadar = (ctx: CanvasRenderingContext2D, angle: number, distance: number, width: number, height: number) => {
-        const radius = Math.min(width, height) / 2; // Radar radius
-        const xCenter = width / 2;
-        const yCenter = height / 2;
-
-        // Clear canvas
-        ctx.clearRect(0, 0, width, height);
-
-        // Draw background
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, width, height);
-
-        // Draw circles
-        ctx.strokeStyle = '#0F0';
-        for (let i = 1; i <= 4; i++) {
-            ctx.beginPath();
-            ctx.arc(xCenter, yCenter, (radius / 5) * i, 0, 2 * Math.PI);
-            ctx.stroke();
+        // Draw radial lines
+        for (let i = 0; i < 360; i += 30) {
+            context.beginPath();
+            context.moveTo(centerX, centerY);
+            const x = centerX + maxRadarRange * Math.cos((i * Math.PI) / 180);
+            const y = centerY + maxRadarRange * Math.sin((i * Math.PI) / 180);
+            context.lineTo(x, y);
+            context.stroke();
         }
 
-        // Convert angle from degrees to radians
-        const angleRad = (angle - 90) * (Math.PI / 180);
+        // Draw each sample as a point
+        distance.forEach((dist, index) => {
+            const angleRad = (angle[index] * Math.PI) / 180; // Convert degrees to radians
 
-        // Calculate the position of the detected object
-        const objectX = xCenter + distance * radius * Math.cos(angleRad);
-        const objectY = yCenter + distance * radius * Math.sin(angleRad);
+            // Normalize the distance so it fits within the radar
+            const normalizedDistance = (dist / Math.max(...distance)) * maxRadarRange;
 
-        // Draw line for angle
-        ctx.beginPath();
-        ctx.moveTo(xCenter, yCenter);
-        ctx.lineTo(objectX, objectY);
-        ctx.lineWidth = 2;
-        ctx.stroke();
+            const x = centerX + normalizedDistance * Math.cos(angleRad);
+            const y = centerY + normalizedDistance * Math.sin(angleRad);
 
-        // Draw object detection point
-        ctx.fillStyle = '#F00';
-        ctx.beginPath();
-        ctx.arc(objectX, objectY, 5, 0, 2 * Math.PI);
-        ctx.fill();
-    };
+            context.beginPath();
+            context.arc(x, y, 5, 0, 2 * Math.PI); // Draw small circle for each point
+            context.fillStyle = light.syntax.func.hex(); // Constant color, adjust alpha or color if needed
+            context.fill();
+        });
+    }, [distance, angle]);
 
     return (
-        <canvas ref={canvasRef} width="300" height="300" style={{ background: '#333' }} />
+        <div style={{ width: '100%', height: '500px' }}>
+            <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
+        </div>
     );
 };
 
