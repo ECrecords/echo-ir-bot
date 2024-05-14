@@ -1,3 +1,12 @@
+/**
+ * @file main.c
+ * @brief RADAR NAVIGATION SYSTEM implementation file.
+ * 
+ * This system interfaces with a radar sensor to receive navigation data over SPI,
+ * processes this data, and sends it to a backend server via WiFi. The system uses
+ * Raspberry Pi Pico SDK, FreeRTOS for task management, and LWIP for network communication.
+ */
+
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 #include "hardware/spi.h"
@@ -35,31 +44,37 @@
 #define SPI_TX_CS 5
 #endif
 
-typedef struct RadarData_
-{
-    uint32_t distance;
-    uint32_t angle;
+/**
+ * @struct RadarData_
+ * @brief Structure to hold radar data.
+ */
+typedef struct RadarData_ {
+    uint32_t distance; ///< Distance measurement from radar.
+    uint32_t angle;    ///< Angle measurement from radar.
 } RadarData_t;
 
-typedef union
-{
-    uint32_t buff[2];
-    RadarData_t rd;
+/**
+ * @union data_t
+ * @brief Union to help with data manipulation.
+ *
+ * Allows access to radar data as both an array of uint32s or as RadarData_t struct.
+ */
+typedef union {
+    uint32_t buff[2]; ///< Buffer as array of uint32s.
+    RadarData_t rd;   ///< Radar data as struct.
 } data_t;
 
 
+
 static int rx_channel;
-
-uint32_t flipEndianness(uint32_t value) {
-    return ((value >> 24) & 0x000000FF) | // Move byte 0 to byte 3
-           ((value << 8) & 0x00FF0000) | // Move byte 1 to byte 2
-           ((value >> 8) & 0x0000FF00) | // Move byte 2 to byte 1
-           ((value << 24) & 0xFF000000); // Move byte 3 to byte 0
-}
-
 static data_t dma_data;
 static QueueHandle_t rx_queue;
 
+/**
+ * @brief Sends radar data to the server over UDP.
+ * @param rx_data Pointer to the radar data to send.
+ * @return None
+ */
 void SendDataToServer(RadarData_t *rx_data) {
     struct udp_pcb *pcb;
     struct pbuf *p;
@@ -100,6 +115,11 @@ void SendDataToServer(RadarData_t *rx_data) {
     udp_remove(pcb);
 }
 
+/**
+ * @brief Configures and manages WiFi connection and data transmission.
+ * @param pvParameters Pointer to task parameters (unused).
+ * @return None
+ */
 void ConfigWifi(void *pvParameters)
 {
     RadarData_t rx_data;
@@ -140,6 +160,11 @@ void ConfigWifi(void *pvParameters)
     cyw43_arch_deinit();
 }
 
+/**
+ * @brief SPI RX interrupt handler.
+ * @param None
+ * @return None
+ */
 void rx_handle()
 {
     xQueueSendFromISR(rx_queue, &dma_data.rd, NULL);
@@ -148,6 +173,11 @@ void rx_handle()
     dma_channel_set_write_addr(rx_channel, dma_data.buff, true);
 }
 
+/**
+ * @brief Configures SPI RX and DMA.
+ * @param None
+ * @return None
+ */
 void configure_spi_rx()
 {
     gpio_init_mask((1 << SPI_SLAVE_CS) | (1 << SPI_SLAVE_MOSI) | (1 << SPI_SLAVE_MISO) | (1 << SPI_SLAVE_CS));
@@ -192,6 +222,10 @@ void configure_spi_rx()
 }
 
 #ifdef SPI_MASTER
+/**
+ * @brief Task to simulate radar data transmission for testing in master mode.
+ * @param pvParameters Pointer to task parameters (unused).
+ */
 void run_master(void *pvParameters)
 {
     data_t data;
@@ -221,6 +255,11 @@ void run_master(void *pvParameters)
     }
 }
 #endif
+
+/**
+ * @brief Main function to initialize system and start scheduler.
+ * @return int Program exit status.
+ */
 int main()
 {
     stdio_uart_init();

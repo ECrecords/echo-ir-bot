@@ -209,7 +209,7 @@ int main(void)
     Duty_Cycle_Right = PWM_NOMINAL;
 
     // Initialize SysTick periodic interrupt with a rate of 100 Hz
-//    SysTick_Interrupt_Init(SYSTICK_INT_NUM_CLK_CYCLES, SYSTICK_INT_PRIORITY);
+    // SysTick_Interrupt_Init(SYSTICK_INT_NUM_CLK_CYCLES, SYSTICK_INT_PRIORITY);
 
     // Initialize the Servo motor
     Servo_Init();
